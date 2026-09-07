@@ -146,6 +146,9 @@ seconds and shows the sanitized local PAPER balance, equity, unrealized result,
 position count, pair, direction, units, entry, current price, stop loss and take
 profit. The page has no buy, sell or close controls and cannot route broker
 orders. The `status Forex` command also lists the currently open PAPER entries.
+When a safe cycle blocks new entries, the dashboard and durable activity history
+show the validated reason (including a high-impact macro window and its affected
+pairs) while making clear that verified PAPER closes remain active.
 It also derives a read-only performance review from closed fills that match the
 tamper-evident execution audit and reconcile with the PAPER balance. The second
 metric row shows sample progress, average trade result, profit factor and the

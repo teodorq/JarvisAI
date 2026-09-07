@@ -32,6 +32,7 @@ class ForexPaperActivityFeedTests(unittest.TestCase):
         status: str = "PAPER_CYCLE_COMPLETED",
         executions: list[dict] | None = None,
         live: bool = False,
+        observation: dict | None = None,
     ) -> None:
         self.path.write_text(
             json.dumps({
@@ -44,6 +45,7 @@ class ForexPaperActivityFeedTests(unittest.TestCase):
                 "broker_orders_sent": False,
                 "live_orders_sent": live,
                 "real_money_access": False,
+                "observation": observation or {},
             }),
             encoding="utf-8",
         )
@@ -103,7 +105,7 @@ class ForexPaperActivityFeedTests(unittest.TestCase):
         blocked = feed.poll()
         self.assertIsNotNone(blocked)
         assert blocked is not None
-        self.assertIn("Wstrzymałem nowe decyzje", blocked["message"])
+        self.assertIn("Wstrzymałem nowe wejścia", blocked["message"])
 
         self.write("cycle-06", status="PAPER_CYCLE_BLOCKED")
         self.assertIsNone(feed.poll())
@@ -113,6 +115,30 @@ class ForexPaperActivityFeedTests(unittest.TestCase):
         self.assertIsNotNone(recovered)
         assert recovered is not None
         self.assertIn("wróciły do prawidłowego stanu", recovered["message"])
+
+    def test_macro_block_names_the_affected_pairs(self) -> None:
+        feed = ForexPaperActivityFeed(self.root, settings=settings())
+        self.write(
+            "cycle-10",
+            status="PAPER_CYCLE_BLOCKED",
+            observation={
+                "opening_blocks": ["HIGH_IMPACT_EVENT_WINDOW"],
+                "opening_blocks_by_pair": {
+                    "EUR_USD": ["HIGH_IMPACT_EVENT_WINDOW"],
+                    "USD_JPY": ["HIGH_IMPACT_EVENT_WINDOW"],
+                    "BAD_PAIR": ["HIGH_IMPACT_EVENT_WINDOW"],
+                },
+            },
+        )
+
+        blocked = feed.poll()
+
+        self.assertIsNotNone(blocked)
+        assert blocked is not None
+        self.assertIn("ważnego wydarzenia makro", blocked["message"])
+        self.assertIn("EUR/USD, USD/JPY", blocked["message"])
+        self.assertNotIn("BAD/PAIR", blocked["message"])
+        self.assertIn("zamknięcia pozostają aktywne", blocked["message"])
 
     def test_safety_flag_produces_owner_attention_without_live_action(self) -> None:
         self.write("cycle-08", live=True)

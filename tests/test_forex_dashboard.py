@@ -169,17 +169,25 @@ def _write_result(root: Path, account: dict, *, live: bool = False) -> None:
     }), encoding="utf-8")
 
 
-def _write_safe_block(root: Path, *, live: bool = False) -> None:
+def _write_safe_block(
+    root: Path,
+    *,
+    live: bool = False,
+    observation: dict | None = None,
+) -> None:
     path = root / "data" / "trading" / "forex_paper_last.json"
     path.parent.mkdir(parents=True)
-    path.write_text(json.dumps({
+    payload = {
         "status": "PAPER_CYCLE_BLOCKED",
         "reason": "CURRENT_OBSERVATION_BLOCKED",
         "observed_at": "2026-08-31T18:54:00+00:00",
         "broker_orders_sent": False,
         "live_orders_sent": live,
         "real_money_access": False,
-    }), encoding="utf-8")
+    }
+    if observation is not None:
+        payload["observation"] = observation
+    path.write_text(json.dumps(payload), encoding="utf-8")
 
 
 def _write_observer_status(
@@ -537,6 +545,34 @@ def test_dashboard_uses_ledger_after_safe_block_without_account() -> None:
         assert snapshot["performance"]["sample_contract_review"][
             "contract_tracking_enabled"
         ] is True
+
+
+def test_dashboard_explains_a_safe_macro_entry_block() -> None:
+    with TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        _write_safe_block(root, observation={
+            "opening_blocks": ["HIGH_IMPACT_EVENT_WINDOW"],
+            "opening_blocks_by_pair": {
+                "EUR_USD": ["HIGH_IMPACT_EVENT_WINDOW"],
+                "USD_JPY": ["HIGH_IMPACT_EVENT_WINDOW"],
+                "NOT_A_PAIR": ["HIGH_IMPACT_EVENT_WINDOW"],
+            },
+        })
+        dashboard = ForexPaperDashboard(root, executor=_Executor(_account()))
+
+        snapshot = dashboard.snapshot()
+
+        assert snapshot["status"] == "READY"
+        assert snapshot["entry_block"] == {
+            "active": True,
+            "codes": ["HIGH_IMPACT_EVENT_WINDOW"],
+            "pairs": ["EUR_USD", "USD_JPY"],
+            "paper_only": True,
+        }
+        assert "ważne wydarzenie makro" in snapshot["message"]
+        assert "EUR/USD, USD/JPY" in snapshot["message"]
+        assert "NOT/A/PAIR" not in snapshot["message"]
+        assert snapshot["live_orders_sent"] is False
 
 
 def test_dashboard_does_not_fallback_after_block_claiming_live() -> None:

@@ -37,7 +37,12 @@ BASE = {
 }
 
 
-def bundle(now: datetime, *, open_market: bool = True) -> ForexDataBundle:
+def bundle(
+    now: datetime,
+    *,
+    open_market: bool = True,
+    blocked_pair: str = "",
+) -> ForexDataBundle:
     quotes = {}
     bars = {}
     contexts = {}
@@ -68,7 +73,7 @@ def bundle(now: datetime, *, open_market: bool = True) -> ForexDataBundle:
             observed_at=now,
             market_open=open_market,
             calendar_ready=True,
-            high_impact_event_blocked=False,
+            high_impact_event_blocked=pair.symbol == blocked_pair,
             conversion_to_pln_ready=True,
             independent_source_count=2,
         )
@@ -175,6 +180,19 @@ class ForexObservationTests(unittest.TestCase):
         self.assertTrue(replay["idempotent_replay"])
         self.assertEqual(service.journal.summary()["observation_count"], 1)
 
+    def test_observation_records_opening_blocks_by_pair(self) -> None:
+        result = self.service().observe_once(
+            observation_id="forex-observation-macro-block",
+            now=self.now,
+            bundle=bundle(self.now, blocked_pair="EUR_USD"),
+        )
+
+        self.assertEqual(result["opening_blocks"], ["HIGH_IMPACT_EVENT_WINDOW"])
+        self.assertEqual(
+            result["opening_blocks_by_pair"],
+            {"EUR_USD": ["HIGH_IMPACT_EVENT_WINDOW"]},
+        )
+
     def test_data_failure_is_recorded_fail_closed(self) -> None:
         service = self.service(failing=True)
         result = service.observe_once(
@@ -184,6 +202,7 @@ class ForexObservationTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "DATA_BLOCKED")
         self.assertIn("SOURCE_UNAVAILABLE", result["opening_blocks"][0])
+        self.assertEqual(result["opening_blocks_by_pair"], {})
         self.assertTrue(result["positions_unchanged"])
         self.assertEqual(result["proposed_instruction_count"], 0)
         self.assertTrue(result["market_data_network_access"])

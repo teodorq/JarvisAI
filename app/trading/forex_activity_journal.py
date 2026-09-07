@@ -15,6 +15,7 @@ from typing import Any, Iterator
 
 from app.core.json_store import JsonStore
 from app.core.project_paths import resolve_project_root
+from app.trading.forex_entry_blocks import activity_block_message
 
 
 _PAIR = re.compile(r"^[A-Z]{3}_[A-Z]{3}$")
@@ -274,9 +275,7 @@ class ForexPaperActivityJournal:
             return [self._spec(
                 "DATA_BLOCKED",
                 "brief",
-                "Wstrzymałem nowe decyzje Forex PAPER, ponieważ bieżąca kontrola "
-                "danych nie przeszła. Spróbuję ponownie automatycznie; LIVE jest "
-                "niedostępny.",
+                activity_block_message(payload),
                 occurred_at,
             )]
         if health == "HEALTHY" and previous_health == "BLOCKED":

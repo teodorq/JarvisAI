@@ -9,14 +9,16 @@ from pathlib import Path
 from typing import Any
 
 from app.core.project_paths import resolve_project_root
+from app.trading.forex_entry_blocks import (
+    dashboard_block_message,
+    opening_block_details,
+)
 
 
 _MAJOR_PAIRS = (
     "EUR_USD", "GBP_USD", "USD_JPY", "USD_CHF",
     "AUD_USD", "USD_CAD", "NZD_USD",
 )
-
-
 class ForexPaperDashboard:
     """Expose only safe account fields required by the owner dashboard."""
 
@@ -49,15 +51,39 @@ class ForexPaperDashboard:
                     source="LATEST_PAPER_CYCLE",
                 )
             if self._safe_blocked_cycle_without_account(payload):
-                return self._local_snapshot(
+                snapshot = self._local_snapshot(
                     observed_at=str(payload.get("observed_at", "")),
                     source="LOCAL_PAPER_LEDGER_AFTER_SAFE_BLOCK",
                 )
+                return self._with_safe_entry_block(snapshot, payload)
             return self._blocked("Raport nie przeszedł kontroli PAPER ONLY.")
         return self._local_snapshot(
             observed_at="",
             source="LOCAL_PAPER_LEDGER",
         )
+
+    @classmethod
+    def _with_safe_entry_block(
+        cls,
+        snapshot: dict[str, Any],
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        if snapshot.get("status") != "READY":
+            return snapshot
+        codes, pairs = opening_block_details(payload)
+        result = dict(snapshot)
+        result["entry_block"] = {
+            "active": True,
+            "codes": list(codes),
+            "pairs": list(pairs),
+            "paper_only": True,
+        }
+        protection = result.get("position_protection")
+        protection = dict(protection) if isinstance(protection, dict) else {}
+        if protection.get("attention_required") is True:
+            return result
+        result["message"] = dashboard_block_message(codes, pairs)
+        return result
 
     def _local_snapshot(self, *, observed_at: str, source: str) -> dict[str, Any]:
         try:

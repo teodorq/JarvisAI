@@ -783,6 +783,11 @@ class ForexObservationService:
                 for context in bundle.contexts.values()
                 for code in context.opening_blocks
             })
+            opening_blocks_by_pair = {
+                pair.symbol: list(bundle.contexts[pair.symbol].opening_blocks)
+                for pair in MAJOR_FOREX_PAIRS
+                if bundle.contexts[pair.symbol].opening_blocks
+            }
             instructions = list(plan.get("instructions", []) or [])
             positions_after = self.executor.positions()
             record = {
@@ -795,6 +800,7 @@ class ForexObservationService:
                     diagnostics["cross_checked_pair_count"] == len(MAJOR_FOREX_PAIRS)
                 ),
                 "opening_blocks": opening_blocks,
+                "opening_blocks_by_pair": opening_blocks_by_pair,
                 "data": diagnostics,
                 "assessments": [item.as_dict() for item in assessments],
                 "proposed_plan": plan,
@@ -911,6 +917,7 @@ class ForexObservationService:
             "market_open": False,
             "fully_cross_checked": False,
             "opening_blocks": [reason],
+            "opening_blocks_by_pair": {},
             "data": {},
             "assessments": [],
             "proposed_plan": {},
