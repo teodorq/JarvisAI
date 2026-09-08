@@ -170,6 +170,13 @@ an entry, exit or promotion decision. The owner status
 also groups actual V1 PAPER openings into the frozen V2
 `retained` and `filtered` cohorts at entry time. This is cohort attribution, not
 a counterfactual V2 portfolio simulation, and cannot prove that V2 is better.
+An isolated counterfactual replay now compares V1 with the frozen V2 regime
+filter on each verified M15 dataset. Both variants receive independent in-memory
+PAPER accounts, identical explicit spread/slippage assumptions and next-bar
+fills. It accepts only bounded Friday-to-Sunday market gaps and fails closed on
+unexpected cadence breaks. Results are comparable only within one pair;
+cross-pair aggregation, automatic strategy changes and LIVE promotion remain
+disabled.
 The observer also writes an atomic, bounded heartbeat to
 `data/trading/forex_observer_status.json`. Owner status can therefore distinguish
 a healthy closed-market idle state from a stale or missing observer without
